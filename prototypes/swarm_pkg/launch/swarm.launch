@@ -1,0 +1,101 @@
+<!-- swarm.launch — запуск роя квадрокоптеров в Gazebo/PX4 -->
+<!--
+  Использование:
+    roslaunch swarm_pkg swarm.launch n:=3
+
+  Параметры:
+    n              : количество дронов (default: 3)
+    altitude       : рабочая высота [м]   (default: 10)
+    area_xmin/xmax : граница области съёмки по X
+    area_ymin/ymax : граница области съёмки по Y
+    fov_deg        : угол обзора камеры [°]
+    overlap        : минимальное перекрытие полос (0..1)
+    log_dir        : директория для CSV-логов
+-->
+<launch>
+
+  <arg name="n"         default="3"/>
+  <arg name="altitude"  default="10.0"/>
+  <arg name="area_xmin" default="0.0"/>
+  <arg name="area_xmax" default="60.0"/>
+  <arg name="area_ymin" default="0.0"/>
+  <arg name="area_ymax" default="60.0"/>
+  <arg name="fov_deg"   default="90.0"/>
+  <arg name="overlap"   default="0.15"/>
+  <arg name="d0_drone"  default="4.0"/>
+  <arg name="d0_obs"    default="3.0"/>
+  <arg name="log_dir"   default="/tmp/swarm_logs"/>
+
+  <!-- ================================================================
+       Дрон 0
+  ================================================================ -->
+  <node
+    pkg="swarm_pkg"
+    type="drone_node.py"
+    name="drone_node_0"
+    output="screen"
+    required="false"
+  >
+    <param name="id"        value="0"/>
+    <param name="total"     value="$(arg n)"/>
+    <param name="altitude"  value="$(arg altitude)"/>
+    <param name="area_xmin" value="$(arg area_xmin)"/>
+    <param name="area_xmax" value="$(arg area_xmax)"/>
+    <param name="area_ymin" value="$(arg area_ymin)"/>
+    <param name="area_ymax" value="$(arg area_ymax)"/>
+    <param name="fov_deg"   value="$(arg fov_deg)"/>
+    <param name="overlap"   value="$(arg overlap)"/>
+    <param name="d0_drone"  value="$(arg d0_drone)"/>
+    <param name="d0_obs"    value="$(arg d0_obs)"/>
+    <param name="log_dir"   value="$(arg log_dir)"/>
+  </node>
+
+  <!-- ================================================================
+       Дрон 1
+  ================================================================ -->
+  <node
+    pkg="swarm_pkg"
+    type="drone_node.py"
+    name="drone_node_1"
+    output="screen"
+    required="false"
+  >
+    <param name="id"        value="1"/>
+    <param name="total"     value="$(arg n)"/>
+    <param name="altitude"  value="$(arg altitude)"/>
+    <param name="area_xmin" value="$(arg area_xmin)"/>
+    <param name="area_xmax" value="$(arg area_xmax)"/>
+    <param name="area_ymin" value="$(arg area_ymin)"/>
+    <param name="area_ymax" value="$(arg area_ymax)"/>
+    <param name="fov_deg"   value="$(arg fov_deg)"/>
+    <param name="overlap"   value="$(arg overlap)"/>
+    <param name="d0_drone"  value="$(arg d0_drone)"/>
+    <param name="d0_obs"    value="$(arg d0_obs)"/>
+    <param name="log_dir"   value="$(arg log_dir)"/>
+  </node>
+
+  <!-- ================================================================
+       Дрон 2
+  ================================================================ -->
+  <node
+    pkg="swarm_pkg"
+    type="drone_node.py"
+    name="drone_node_2"
+    output="screen"
+    required="false"
+  >
+    <param name="id"        value="2"/>
+    <param name="total"     value="$(arg n)"/>
+    <param name="altitude"  value="$(arg altitude)"/>
+    <param name="area_xmin" value="$(arg area_xmin)"/>
+    <param name="area_xmax" value="$(arg area_xmax)"/>
+    <param name="area_ymin" value="$(arg area_ymin)"/>
+    <param name="area_ymax" value="$(arg area_ymax)"/>
+    <param name="fov_deg"   value="$(arg fov_deg)"/>
+    <param name="overlap"   value="$(arg overlap)"/>
+    <param name="d0_drone"  value="$(arg d0_drone)"/>
+    <param name="d0_obs"    value="$(arg d0_obs)"/>
+    <param name="log_dir"   value="$(arg log_dir)"/>
+  </node>
+
+</launch>
