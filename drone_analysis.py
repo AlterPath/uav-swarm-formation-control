@@ -231,6 +231,29 @@ def load_obstacles(path: str) -> list:
     return obs
 
 
+def resolve_obstacles_for_obs(obs_tag: str, base_dir: Path,
+                               cli_path: str = None) -> list:
+    """Возвращает список препятствий для конкретного тега (no_obstacles/light/heavy).
+    Логика поиска (по приоритету):
+      1) Если obs_tag == 'no_obstacles' — пустой список.
+      2) В base_dir ищется файл obstacles_<tag>.txt (например, obstacles_light.txt).
+      3) Если не найден — fallback на cli_path (--obstacles_file) или base_dir/obstacles.txt.
+    """
+    if obs_tag == 'no_obstacles':
+        return []
+    candidates = [
+        base_dir / f'obstacles_{obs_tag}.txt',
+        Path(f'obstacles_{obs_tag}.txt'),
+    ]
+    for p in candidates:
+        if p.exists():
+            print(f'  [obstacles] {obs_tag} → {p}')
+            return load_obstacles(str(p))
+    fallback = cli_path or str(base_dir / 'obstacles.txt')
+    print(f'  [obstacles] {obs_tag} → fallback {fallback}')
+    return load_obstacles(fallback)
+
+
 # ══════════════════════════════════════════════════════════════════════════════
 # ──  УСРЕДНЕНИЕ ПО ПРОГОНАМ  ─────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
@@ -415,7 +438,7 @@ def add_events(ax, events, alpha=0.6):
         'MISSION_START': ('#27ae60', '--', 'Старт'),
         'MISSION_END':   ('#e74c3c', '--', 'Конец'),
         'DRONE_LOST':    ('#e67e22', ':', 'Потеря дрона'),
-        'RTL':           ('#8e44ad', ':', 'RTL'),
+        'RTL':           ('#8e44ad', ':', 'Возвращение'),
         'WAYPOINT':      ('#95a5a6', ':', None),
     }
     added = set()
@@ -560,13 +583,23 @@ def averaged_to_drones(averaged: dict) -> list:
 # ──  ОТРИСОВКА ЭЛЕМЕНТОВ  ────────────────────────────────────────────────────
 # ══════════════════════════════════════════════════════════════════════════════
 
-def draw_obstacles(ax, obstacles: list):
+def draw_obstacles(ax, obstacles: list, safe_margin: float = 1.5):
+    """Рисует препятствия на оси.
+    safe_margin — дополнительный радиус зоны безопасности (как в логике APF).
+    Внешний круг (зона безопасности) — пунктирный, внутренний (само препятствие) — заливка.
+    """
     for ox, oy, orad in obstacles:
         oy_plot = float(ay(np.array([oy]))[0])
+        if safe_margin > 0:
+            safe_circ = plt.Circle((ox, oy_plot), orad + safe_margin,
+                                    facecolor='none', edgecolor='#2c3e50',
+                                    linestyle='--', linewidth=1.0, alpha=0.45,
+                                    zorder=6)
+            ax.add_patch(safe_circ)
         circ = plt.Circle((ox, oy_plot), orad,
                            color='#2c3e50', alpha=0.55, zorder=7)
         ax.add_patch(circ)
-        ax.text(ox, oy_plot, f'r={orad:.0f}',
+        ax.text(ox, oy_plot, f'r={orad:.1f}',
                 ha='center', va='center', fontsize=7.5,
                 color='white', fontweight='bold', zorder=8)
 
@@ -917,8 +950,8 @@ def plot_formation_error(averaged: dict, tag: str, out_dir: str):
 
     n_runs = list(averaged.values())[0]['n_runs'] if averaged else 1
     ax.set_xlabel('Время миссии, с')
-    ax.set_ylabel('Ошибка формации, м')
-    ax.set_title(f'Ошибка формации (среднее ± σ по {n_runs} прогонам) — {tag}')
+    ax.set_ylabel('Ошибка строя, м')
+    ax.set_title(f'Ошибка строя — {tag}')
     ax.legend()
     ax.set_ylim(bottom=0)
     fig.tight_layout()
@@ -945,7 +978,7 @@ def plot_lane_error(averaged: dict, tag: str, out_dir: str):
 
     ax.set_xlabel('Время миссии, с')
     ax.set_ylabel('Ошибка полосы, м')
-    ax.set_title(f'Lane Error — отклонение от своей Y-полосы — {tag}')
+    ax.set_title(f'Отклонение от своей полосы — {tag}')
     ax.legend()
     ax.set_ylim(bottom=0)
     fig.tight_layout()
@@ -1002,7 +1035,7 @@ def plot_neighbor_distance(averaged: dict, tag: str, out_dir: str):
                alpha=0.7, label='D_SAFE = 1.5 м')
     ax.set_xlabel('Время миссии, с')
     ax.set_ylabel('Расстояние до соседа, м')
-    ax.set_title(f'Межбортная дистанция — {tag}')
+    ax.set_title(f'Расстояние до соседа — {tag}')
     ax.legend()
     ax.set_ylim(bottom=0)
     fig.tight_layout()
@@ -1065,8 +1098,8 @@ def plot_dashboard(averaged: dict, tag: str, out_dir: str):
     gs  = gridspec.GridSpec(3, 2, figure=fig, hspace=0.45, wspace=0.35)
 
     panel_configs = [
-        ('formation_error_m', 'Ошибка формации, м',      gs[0, 0]),
-        ('lane_error_m',      'Lane error (Y-полоса), м', gs[0, 1]),
+        ('formation_error_m', 'Ошибка строя, м',      gs[0, 0]),
+        ('lane_error_m',      'Отклонение от полосы, м', gs[0, 1]),
         ('velocity_mps',      'Скорость, м/с',            gs[1, 0]),
         ('nearest_neighbor_m','Расстояние до соседа, м',  gs[1, 1]),
         ('coverage_pct',      'Покрытие поля, %',         gs[2, 0]),
@@ -1153,6 +1186,11 @@ def plot_deviation_heatmap(averaged: dict, tag: str, out_dir: str, obstacles=Non
         if obstacles:
             for ox, oy, orad in obstacles:
                 oy_plot = float(ay(np.array([oy]))[0])
+                safe_circ = plt.Circle((ox, oy_plot), orad + 1.5,
+                                        facecolor='none', edgecolor='white',
+                                        linestyle='--', linewidth=0.9, alpha=0.5,
+                                        zorder=3)
+                ax.add_patch(safe_circ)
                 circ = plt.Circle((ox, oy_plot), orad, color='white', alpha=0.6, zorder=3)
                 ax.add_patch(circ)
 
@@ -1173,7 +1211,7 @@ def plot_deviation_heatmap(averaged: dict, tag: str, out_dir: str, obstacles=Non
 def plot_summary_table(all_summaries: dict, out_dir: str):
     rows = []
     cols = ['Сценарий', 'Дрон',
-            'Ош.формации (ср.)', 'Lane error (ср.)',
+            'Ош.строя (ср.)', 'Отклонение от полосы (ср.)',
             'Ближ.сосед (ср.)', 'Скорость (ср.)',
             'Покрытие (%)', 'Длина пути (м)', 'Время (с)']
 
@@ -1309,9 +1347,10 @@ def main():
     print(f'  Координаты:   {coord_info}')
     print('=' * 65)
 
-    # Препятствия
-    obs_path  = args.obstacles_file or str(base_dir / 'obstacles.txt')
-    obstacles = load_obstacles(obs_path)
+    # Препятствия: резолвятся для каждой обстановки (no_obstacles/light/heavy) отдельно.
+    # CLI-аргумент --obstacles_file работает как fallback для случаев, когда нет
+    # специфичного файла obstacles_<tag>.txt в base_dir.
+    obs_cli_path = args.obstacles_file
 
     # Сканирование
     print('\n[1] Сканирование каталога...')
@@ -1335,6 +1374,7 @@ def main():
     print('\n[2] Усреднение по прогонам...')
     all_averaged  = {}
     all_summaries = {}
+    obs_by_tag    = {}
 
     for algo, obs_dict in sorted(raw.items()):
         for obs, mode_dict in sorted(obs_dict.items()):
@@ -1349,16 +1389,28 @@ def main():
 
                 all_averaged[safe_tag]  = averaged
                 all_summaries[safe_tag] = compute_summary(averaged)
+                obs_by_tag[safe_tag]    = obs
 
     if not all_averaged:
         print('[ERROR] Нет усреднённых данных.')
         sys.exit(1)
+
+    # Кэш загруженных препятствий по обстановке (чтобы не читать файл многократно)
+    obstacles_cache = {}
+    def get_obstacles_for(tag: str) -> list:
+        obs_tag = obs_by_tag.get(tag, '')
+        if obs_tag not in obstacles_cache:
+            obstacles_cache[obs_tag] = resolve_obstacles_for_obs(
+                obs_tag, base_dir, obs_cli_path)
+        return obstacles_cache[obs_tag]
 
     # Генерация графиков
     print('\n[3] Генерация графиков...')
     for safe_tag, averaged in sorted(all_averaged.items()):
         nice = safe_tag.replace('_', ' / ')
         print(f'\n  Сценарий: {nice}')
+
+        obstacles = get_obstacles_for(safe_tag)
 
         # ── Траектории (v2) ───────────────────────────────────────────────
         drones_list = averaged_to_drones(averaged)
