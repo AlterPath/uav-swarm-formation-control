@@ -1,5 +1,3 @@
-
-
 import rospy
 import math
 import threading

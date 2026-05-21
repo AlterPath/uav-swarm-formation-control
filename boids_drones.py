@@ -1,5 +1,3 @@
-
-
 import argparse
 import csv
 import math
@@ -40,7 +38,7 @@ CAM_FOV_DEG = 78.0
 OVERLAP = 0.2
 LOG_HZ = 5.0
 
-SWARM_REACH_TOL = 2.5
+SWARM_REACH_TOL = 3
 SWARM_QUORUM = 0.66
 
 OBSTACLES = []
@@ -66,6 +64,9 @@ class DroneNode:
         self.neighbors_lock = threading.Lock()
         self.seen_ids: set = {self.id}
         self.alive_ids: set = {self.id}
+        self.alive_ids_locked = False
+        
+        self.startup_time = time.time()
 
         self.mission_started = False
         self.ready_set: set = set()
@@ -185,7 +186,7 @@ class DroneNode:
             self.obstacles = list(OBSTACLES)
             rospy.loginfo('[%s] препятствия по умолчанию', self.ns)
 
-        rospy.loginfo('[%s] инициализирован (boids), id=%d', self.ns, self.id)
+        rospy.loginfo('[%s] запущен, id=%d', self.ns, self.id)
 
     def state_cb(self, msg):
         self.state = msg
@@ -308,8 +309,7 @@ class DroneNode:
                 t = v[-1]
                 if now - t < dead_timeout: alive.add(nid)
             seen = set(self.seen_ids)
-        if self.alive_ids_locked:
-            alive = alive | self.alive_ids
+        if self.alive_ids_locked: alive = alive | self.alive_ids
         lost = (self.alive_ids & seen) - alive
         if lost and not in_startup and not self.alive_ids_locked:
             rospy.logwarn('[%s] потеряны дроны: %s', self.ns, lost)
@@ -458,7 +458,6 @@ class DroneNode:
         return vx, vy
 
     def fly_swarm_follower(self):
-        """Ведомый: летит к swarm_goal в режиме Boids, публикует reached, выходит при MISSION_END."""
         r = rospy.Rate(CONTROL_HZ)
         last_reported_seq = -1
         while not rospy.is_shutdown() and not self.mission_done:
@@ -489,8 +488,6 @@ class DroneNode:
             r.sleep()
 
     def lead_swarm(self, route):
-        """Лидер: публикует waypoint'ы, ждёт кворум reached, делает фото на достижении.
-        Сам тоже летит как обычный участник роя (boids_velocity к swarm_goal)."""
         r = rospy.Rate(CONTROL_HZ)
         for i, p in enumerate(route):
             seq = i + 1
@@ -626,7 +623,7 @@ class DroneNode:
                     rospy.logwarn('arm: %s', e)
                 last_req = rospy.Time.now()
             if self.state.armed and self.state.mode == 'OFFBOARD':
-                rospy.loginfo('[%s] OFFBOARD+ARMED', self.ns)
+                rospy.loginfo('[%s] OFFBOARD ARMED', self.ns)
                 return
             sp.header.stamp = rospy.Time.now()
             self.sp_pub.publish(sp)
@@ -640,7 +637,6 @@ class DroneNode:
             rospy.logwarn('land: %s', e)
 
     def barrier_wait(self):
-        rospy.loginfo('[%s] ожидание барьера...', self.ns)
         r = rospy.Rate(2.0)
         while not rospy.is_shutdown():
             self.ready_pub.publish(String(data=str(self.id)))
@@ -654,7 +650,7 @@ class DroneNode:
             r.sleep()
 
     def run(self):
-        rospy.loginfo('[%s] ждём FCU...', self.ns)
+        rospy.loginfo('[%s] ждём FCU', self.ns)
         r = rospy.Rate(5.0)
         while not rospy.is_shutdown() and not self.state.connected: r.sleep()
         while not rospy.is_shutdown() and not self.have_pose: r.sleep()
@@ -667,7 +663,7 @@ class DroneNode:
                 self.field_wid = self.cli_wid
                 self.alt = self.cli_alt
                 self.alt_original = self.alt
-                rospy.loginfo('[%s] параметры из CLI: L=%.1f W=%.1f H=%.1f',
+                rospy.loginfo('[%s] параметры получены: L=%.1f W=%.1f H=%.1f',
                               self.ns, self.field_len, self.field_wid, self.alt)
             else:
                 self.field_len = float(input('Длина : '))
@@ -681,18 +677,18 @@ class DroneNode:
                 rospy.sleep(0.2)
             self.params_received.set()
         else:
-            rospy.loginfo('[%s] ждём параметры...', self.ns)
+            rospy.loginfo('[%s] ждёт параметры', self.ns)
             while not rospy.is_shutdown() and not self.params_received.is_set(): rospy.sleep(0.2)
 
         self.arm_and_offboard()
-        rospy.loginfo('[%s] ожидание появления всех соседей в группе...', self.ns)
+        rospy.loginfo('[%s] ожидание появления всех в группе', self.ns)
         wait_start = time.time()
         while not rospy.is_shutdown() and time.time() - wait_start < 15.0:
             with self.neighbors_lock:
                 n_seen = len(self.neighbors) + 1
             if n_seen >= self.total: break
             rospy.sleep(0.2)
-        rospy.loginfo('[%s] видимый состав до барьера: %s', self.ns, sorted(self.alive_ids))
+        rospy.loginfo('[%s] видимый состав до начала: %s', self.ns, sorted(self.alive_ids))
 
         self.barrier_wait()
 
@@ -718,7 +714,7 @@ class DroneNode:
                              start[1] - self.pose.pose.position.y)
             if abs(dz) < 0.4 and dxy < 1.0: break
             if time.time() - t0 > 90.0:
-                rospy.logwarn('[%s] долго взлетает, продолжаем', self.ns)
+                rospy.logwarn('[%s] долго взлетает', self.ns)
                 break
             ctrl.sleep()
         self.mission_started = True
@@ -728,7 +724,7 @@ class DroneNode:
 
         if self.is_leader:
             route = self.build_swarm_route()
-            rospy.loginfo('[%s] общий маршрут роя: %d точек', self.ns, len(route))
+            rospy.loginfo('[%s] маршрут роя: %d точек', self.ns, len(route))
             self.lead_swarm(route)
             rospy.loginfo('[%s] маршрут завершён', self.ns)
             home = (0.0, start_y, self.alt)
@@ -759,7 +755,7 @@ class DroneNode:
                 self.swarm_goal_pub.publish(end_msg)
                 rospy.sleep(0.2)
         else:
-            rospy.loginfo('[%s] следую за роем...', self.ns)
+            rospy.loginfo('[%s] следует', self.ns)
             self.fly_swarm_follower()
 
         self.land()

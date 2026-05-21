@@ -1,5 +1,3 @@
-
-
 import argparse
 import csv
 import math
@@ -174,7 +172,7 @@ class DroneNode:
         except Exception:
             self.obstacles = list(OBSTACLES)
 
-        rospy.loginfo('[%s] инициализирован (APF+lanes), id=%d', self.ns, self.id)
+        rospy.loginfo('[%s] запущен (APF+lanes), id=%d', self.ns, self.id)
 
     def state_cb(self, msg):
         self.state = msg
@@ -443,7 +441,7 @@ class DroneNode:
                     rospy.logwarn('arm: %s', e)
                 last_req = rospy.Time.now()
             if self.state.armed and self.state.mode == 'OFFBOARD':
-                rospy.loginfo('[%s] OFFBOARD+ARMED', self.ns)
+                rospy.loginfo('[%s] OFFBOARD ARMED', self.ns)
                 return
             sp.header.stamp = rospy.Time.now()
             self.sp_pub.publish(sp)
@@ -457,7 +455,6 @@ class DroneNode:
             rospy.logwarn('land: %s', e)
 
     def barrier_wait(self):
-        rospy.loginfo('[%s] ожидание барьера...', self.ns)
         r = rospy.Rate(2.0)
         while not rospy.is_shutdown():
             self.ready_pub.publish(String(data=str(self.id)))
@@ -465,7 +462,7 @@ class DroneNode:
                 self.ready_set.add(self.id)
                 if self.alive_ids.issubset(self.ready_set) and self.alive_ids.issuperset(self.ready_set):
                     self.alive_ids_locked = True
-                    rospy.loginfo('[%s] барьер пройден, состав группы: %s',
+                    rospy.loginfo('[%s] состав группы: %s',
                                   self.ns, sorted(self.alive_ids))
                     return
             r.sleep()
@@ -562,7 +559,6 @@ class DroneNode:
         self.log_metrics('PHOTO_' + event)
 
     def run(self):
-        rospy.loginfo('[%s] ждём FCU...', self.ns)
         r = rospy.Rate(5.0)
         while not rospy.is_shutdown() and not self.state.connected: r.sleep()
         while not rospy.is_shutdown() and not self.have_pose: r.sleep()
@@ -575,7 +571,7 @@ class DroneNode:
                 self.field_wid = self.cli_wid
                 self.alt = self.cli_alt
                 self.alt_original = self.alt
-                rospy.loginfo('[%s] параметры из CLI: L=%.1f W=%.1f H=%.1f',
+                rospy.loginfo('[%s] параметры: L=%.1f W=%.1f H=%.1f',
                               self.ns, self.field_len, self.field_wid, self.alt)
             else:
                 self.field_len = float(input('Длина : '))
@@ -589,18 +585,18 @@ class DroneNode:
                 rospy.sleep(0.2)
             self.params_received.set()
         else:
-            rospy.loginfo('[%s] ждём параметры...', self.ns)
+            rospy.loginfo('[%s] ждёт параметры', self.ns)
             while not rospy.is_shutdown() and not self.params_received.is_set(): rospy.sleep(0.2)
 
         self.arm_and_offboard()
-        rospy.loginfo('[%s] ожидание появления всех соседей в группе...', self.ns)
+        rospy.loginfo('[%s] ожидание появления всех в группе', self.ns)
         wait_start = time.time()
         while not rospy.is_shutdown() and time.time() - wait_start < 15.0:
             with self.neighbors_lock:
                 n_seen = len(self.neighbors) + 1
             if n_seen >= self.total: break
             rospy.sleep(0.2)
-        rospy.loginfo('[%s] видимый состав до барьера: %s', self.ns, sorted(self.alive_ids))
+        rospy.loginfo('[%s] видимый состав: %s', self.ns, sorted(self.alive_ids))
 
         self.barrier_wait()
 

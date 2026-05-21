@@ -1,5 +1,3 @@
-
-
 import argparse
 import csv
 import math
@@ -474,7 +472,6 @@ class DroneNode:
             rospy.logwarn('land: %s', e)
 
     def barrier_wait(self):
-        rospy.loginfo('[%s] ожидание барьера...', self.ns)
         r = rospy.Rate(2.0)
         while not rospy.is_shutdown():
             self.ready_pub.publish(String(data=str(self.id)))
@@ -482,7 +479,7 @@ class DroneNode:
                 self.ready_set.add(self.id)
                 if self.alive_ids.issubset(self.ready_set) and self.alive_ids.issuperset(self.ready_set):
                     self.alive_ids_locked = True
-                    rospy.loginfo('[%s] барьер пройден, состав группы зафиксирован: %s',
+                    rospy.loginfo('[%s]состав группы: %s',
                                   self.ns, sorted(self.alive_ids))
                     return
             r.sleep()
@@ -595,7 +592,7 @@ class DroneNode:
                 self.field_wid = self.cli_wid
                 self.alt = self.cli_alt
                 self.alt_original = self.alt
-                rospy.loginfo('[%s] параметры из CLI: L=%.1f W=%.1f H=%.1f',
+                rospy.loginfo('[%s] параметры: L=%.1f W=%.1f H=%.1f',
                               self.ns, self.field_len, self.field_wid, self.alt)
             else:
                 self.field_len = float(input('Длина поля: '))
@@ -615,14 +612,14 @@ class DroneNode:
 
         self.arm_and_offboard()
 
-        rospy.loginfo('[%s] ожидание появления всех соседей в группе...', self.ns)
+        rospy.loginfo('[%s] ожидание появления всех в группе', self.ns)
         wait_start = time.time()
         while not rospy.is_shutdown() and time.time() - wait_start < 15.0:
             with self.neighbors_lock:
                 n_seen = len(self.neighbors) + 1
             if n_seen >= self.total: break
             rospy.sleep(0.2)
-        rospy.loginfo('[%s] видимый состав до барьера: %s', self.ns, sorted(self.alive_ids))
+        rospy.loginfo('[%s] видимый состав: %s', self.ns, sorted(self.alive_ids))
 
         self.barrier_wait()
 
