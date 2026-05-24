@@ -80,7 +80,7 @@ With a drone lost, the formation error of the potential-field methods stays at a
   </tr>
 </table>
 
-Plot labels are in Russian, as in the thesis. Raw run logs (about 16 MB of CSV) and camera frames (about 3,000 images) are not included; the summary table and plots were built from them.
+Plot labels are in Russian, as in the thesis. The raw data is in the [release](../../releases/tag/experiment-data): run metrics in CSV, photo telemetry and camera frames. `vkr_results.zip` holds the first batch with plots and the summary table, `vkr_results_maps.zip` holds the full batch with photos for mapping.
 
 ## Quick start
 
