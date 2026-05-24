@@ -118,9 +118,9 @@ OVERLAP    = 0.2
 # ── Стиль matplotlib ──────────────────────────────────────────────────────────
 plt.rcParams.update({
     'font.family':    'DejaVu Sans',
-    'font.size':      11,
-    'axes.titlesize': 13,
-    'axes.labelsize': 11,
+    'font.size':      18,
+    'axes.titlesize': 20,
+    'axes.labelsize': 18,
     'legend.fontsize': 9,
     'figure.dpi':     130,
     'lines.linewidth': 1.6,
@@ -600,7 +600,7 @@ def draw_obstacles(ax, obstacles: list, safe_margin: float = 1.5):
                            color='#2c3e50', alpha=0.55, zorder=7)
         ax.add_patch(circ)
         ax.text(ox, oy_plot, f'r={orad:.1f}',
-                ha='center', va='center', fontsize=7.5,
+                ha='center', va='center', fontsize=14,
                 color='white', fontweight='bold', zorder=8)
 
 
@@ -782,7 +782,7 @@ def plot_all_together(drones: list, obstacles: list, out_dir: str, tag: str):
                         path_effects=[pe.withStroke(linewidth=2, foreground='white')])
 
     draw_obstacles(ax, obstacles)
-    style_ax(ax, f'Траектории всех дронов — {tag}', xmin, xmax, ymin, ymax)
+    style_ax(ax, f'Траектории всех дронов — {tag}', xmin, xmax, ymin, ymax, show_legend=False)
     fig.tight_layout()
     _save_fig_named(fig, f'01a_traj_all_{tag}', True, out_dir)
 
