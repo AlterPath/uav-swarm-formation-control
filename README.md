@@ -101,3 +101,7 @@ Python, ROS (rospy), MAVROS, PX4 SITL, Gazebo, OpenCV (`cv_bridge`), pandas, Num
 ## Лицензия
 
 [MIT](LICENSE)
+
+---
+
+<sub>Код написан в апреле–мае 2026, на GitHub выложен в ноябре 2026. Даты коммитов взяты по датам исходных файлов, README и иллюстрации добавлены при выгрузке.</sub>
